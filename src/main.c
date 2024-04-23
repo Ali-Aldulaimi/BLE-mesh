@@ -25,7 +25,7 @@
 #define OP_ONOFF_SET_UNACK BT_MESH_MODEL_OP_2(0x82, 0x03)
 #define OP_ONOFF_STATUS    BT_MESH_MODEL_OP_2(0x82, 0x04)
 
-static void attention_on(const struct bt_mesh_model *mod)
+static void attention_on(const struct bt_mesh_model *mod)			//attention_on and attention_off control an LED to indicate the device's attention state as part of the mesh health model.
 {
 	board_led_set(true);
 }
@@ -46,7 +46,7 @@ static struct bt_mesh_health_srv health_srv = {
 
 BT_MESH_HEALTH_PUB_DEFINE(health_pub, 0);
 
-static const char *const onoff_str[] = { "off", "on" };
+static const char *const onoff_str[] = { "off", "on" };		//onoff_str: An array of strings representing "off" and "on" states for easy logging.
 
 static struct {
 	bool val;
@@ -54,7 +54,7 @@ static struct {
 	uint16_t src;
 	uint32_t transition_time;
 	struct k_work_delayable work;
-} onoff;
+} onoff;													//onoff: A structure to keep track of the current state, the source address of the last command, 
 
 /* OnOff messages' transition time and remaining time fields are encoded as an
  * 8 bit value with a 6 bit step field and a 2 bit resolution field.
@@ -64,14 +64,14 @@ static struct {
  * 2: 10 s
  * 3: 20 min
  */
-static const uint32_t time_res[] = {
+static const uint32_t time_res[] = {			//time_res: An array defining time resolutions for decoding and encoding transition times.
 	100,
 	MSEC_PER_SEC,
 	10 * MSEC_PER_SEC,
 	10 * 60 * MSEC_PER_SEC,
 };
 
-static inline int32_t model_time_decode(uint8_t val)
+static inline int32_t model_time_decode(uint8_t val)			//model_time_decode and model_time_encode are functions to convert between milliseconds and a compact format used in mesh messages, which combines a resolution and step count to fit into a single byte.
 {
 	uint8_t resolution = (val >> 6) & BIT_MASK(2);
 	uint8_t steps = val & BIT_MASK(6);
@@ -130,7 +130,8 @@ static int onoff_status_send(const struct bt_mesh_model *model,
 	return bt_mesh_model_send(model, ctx, &buf, NULL, NULL);
 }
 
-static void onoff_timeout(struct k_work *work)
+static void onoff_timeout(struct k_work *work)				//onoff_timeout handles the completion of a state transition due to delay or transition time, updating the LED state accordingly.
+
 {
 	if (onoff.transition_time) {
 		/* Start transition.
@@ -151,7 +152,7 @@ static void onoff_timeout(struct k_work *work)
 
 /* Generic OnOff Server message handlers */
 
-static int gen_onoff_get(const struct bt_mesh_model *model,
+static int gen_onoff_get(const struct bt_mesh_model *model,					//Functions like gen_onoff_get, gen_onoff_set, and gen_onoff_set_unack handle incoming messages to get, set, or set without acknowledgment the OnOff state of the node.
 			 struct bt_mesh_msg_ctx *ctx,
 			 struct net_buf_simple *buf)
 {
@@ -306,6 +307,7 @@ static int gen_onoff_send(bool val)
 		.app_idx = models[3].keys[0], /* Use the bound key */
 		.addr = BT_MESH_ADDR_ALL_NODES,
 		.send_ttl = BT_MESH_TTL_DEFAULT,
+		
 	};
 	static uint8_t tid;
 
@@ -399,6 +401,20 @@ static void bt_ready(int err)
 	printk("Mesh initialized\n");
 }
 
+static void broadcast_message(struct k_work *work)
+{
+	if (bt_mesh_is_provisioned()) {
+    // Toggle the LED state and the OnOff state variable
+    onoff.val = !onoff.val;
+    board_led_set(onoff.val); // Assuming board_led_set() sets the actual LED
+
+    // Send the OnOff state to all nodes
+    gen_onoff_send(onoff.val);
+
+    // Reschedule the work to run again after one second
+    k_work_reschedule(&onoff.work, K_SECONDS(1));
+}}
+
 int main(void)
 {
 	static struct k_work button_work;
@@ -430,5 +446,7 @@ int main(void)
 	if (err) {
 		printk("Bluetooth init failed (err %d)\n", err);
 	}
+	k_work_init_delayable(&onoff.work, broadcast_message);
+    k_work_reschedule(&onoff.work, K_SECONDS(2));
 	return 0;
 }
