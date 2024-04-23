@@ -208,8 +208,6 @@ static int gen_onoff_set(const struct bt_mesh_model *model,
 {
 	(void)gen_onoff_set_unack(model, ctx, buf);
 	onoff_status_send(model, ctx);
-	
-	
 
 	return 0;
 }
@@ -322,8 +320,7 @@ static int gen_onoff_send(bool val)
 	net_buf_simple_add_u8(&buf, val);
 	net_buf_simple_add_u8(&buf, tid++);
 
-	printk("Sending OnOff Set: %s\n", onoff_str[val]);
-	
+	printk("Broudcaster sending message: %s\n", onoff_str[val]);
 
 	return bt_mesh_model_send(&models[3], &ctx, &buf, NULL, NULL);
 }
@@ -331,11 +328,8 @@ static int gen_onoff_send(bool val)
 static void button_pressed(struct k_work *work)
 {
 	if (bt_mesh_is_provisioned()) {
-		
 		(void)gen_onoff_send(!onoff.val);
-	
 		return;
-		
 	}
 
 	/* Self-provision with an arbitrary address.
