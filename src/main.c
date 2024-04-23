@@ -320,7 +320,7 @@ static int gen_onoff_send(bool val)
 	net_buf_simple_add_u8(&buf, val);
 	net_buf_simple_add_u8(&buf, tid++);
 
-	printk("Broudcaster sending message: %s\n", onoff_str[val]);
+	printk("Broadcaster sending message: %s\n", onoff_str[val]);
 
 	return bt_mesh_model_send(&models[3], &ctx, &buf, NULL, NULL);
 }
