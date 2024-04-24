@@ -303,150 +303,117 @@ static const struct bt_mesh_prov prov = {
 /** Send an OnOff Set message from the Generic OnOff Client to all nodes. */
 static int gen_onoff_send(bool val)
 {
-	struct bt_mesh_msg_ctx ctx = {
-		.app_idx = models[3].keys[0], /* Use the bound key */
-		.addr = BT_MESH_ADDR_ALL_NODES,
-		.send_ttl = BT_MESH_TTL_DEFAULT,
-		
-	};
-	static uint8_t tid;
+    struct bt_mesh_msg_ctx ctx = {
+        .app_idx = models[3].keys[0], /* Use the bound key */
+        .addr = BT_MESH_ADDR_ALL_NODES,
+        .send_ttl = BT_MESH_TTL_DEFAULT,
+    };
+    static uint8_t tid;
 
-	if (ctx.app_idx == BT_MESH_KEY_UNUSED) {
-		printk("The Generic OnOff Client must be bound to a key before "
-		       "sending.\n");
-		return -ENOENT;
-	}
+    // Check if the app_idx is set to a valid key index
+    if (ctx.app_idx == BT_MESH_KEY_UNUSED) {
+        printk("The Generic OnOff Client must be bound to a key before sending.\n");
+        return -ENOENT; // No such entry error to indicate the key is not bound
+    }
 
-	BT_MESH_MODEL_BUF_DEFINE(buf, OP_ONOFF_SET_UNACK, 2);
-	bt_mesh_model_msg_init(&buf, OP_ONOFF_SET_UNACK);
-	net_buf_simple_add_u8(&buf, val);
-	net_buf_simple_add_u8(&buf, tid++);
+    BT_MESH_MODEL_BUF_DEFINE(buf, OP_ONOFF_SET_UNACK, 2);
+    bt_mesh_model_msg_init(&buf, OP_ONOFF_SET_UNACK);
+    net_buf_simple_add_u8(&buf, val);
+    net_buf_simple_add_u8(&buf, tid++);
 
-	printk("Broadcaster sending message: %s\n", onoff_str[val]);
+    printk("Broadcaster sending message: %s\n", onoff_str[val]);
 
-	return bt_mesh_model_send(&models[3], &ctx, &buf, NULL, NULL);
+    return bt_mesh_model_send(&models[3], &ctx, &buf, NULL, NULL);
+}
+static void broadcast_message(struct k_work *work)
+{
+    if (bt_mesh_is_provisioned() && models[3].keys[0] != BT_MESH_KEY_UNUSED) {
+        onoff.val = !onoff.val; // Toggle the LED state
+        board_led_set(onoff.val);
+
+        // Send the OnOff state to all nodes
+        gen_onoff_send(onoff.val);
+
+        // Reschedule the work to run again after one second only if successful
+        k_work_reschedule(&onoff.work, K_SECONDS(1));
+    } else {
+        // Do not reschedule if not provisioned or key not bound
+        printk("Cannot broadcast: either not provisioned or no key bound.\n");
+    }
 }
 
 static void button_pressed(struct k_work *work)
 {
-	if (bt_mesh_is_provisioned()) {
-		(void)gen_onoff_send(!onoff.val);
-		return;
-	}
-
-	/* Self-provision with an arbitrary address.
-	 *
-	 * NOTE: This should never be done in a production environment.
-	 *       Addresses should be assigned by a provisioner, and keys should
-	 *       be generated from true random numbers. It is done in this
-	 *       sample to allow testing without a provisioner.
-	 */
-	static uint8_t net_key[16];
-	static uint8_t dev_key[16];
-	static uint8_t app_key[16];
-	uint16_t addr;
-	int err;
-
-	if (IS_ENABLED(CONFIG_HWINFO)) {
-		addr = sys_get_le16(&dev_uuid[0]) & BIT_MASK(15);
-	} else {
-		addr = k_uptime_get_32() & BIT_MASK(15);
-	}
-
-	printk("Self-provisioning with address 0x%04x\n", addr);
-	err = bt_mesh_provision(net_key, 0, 0, 0, addr, dev_key);
-	if (err) {
-		printk("Provisioning failed (err: %d)\n", err);
-		return;
-	}
-
-	/* Add an application key to both Generic OnOff models: */
-	err = bt_mesh_app_key_add(0, 0, app_key);
-	if (err) {
-		printk("App key add failed (err: %d)\n", err);
-		return;
-	}
-
-	/* Models must be bound to an app key to send and receive messages with
-	 * it:
-	 */
-	models[2].keys[0] = 0;
-	models[3].keys[0] = 0;
-
-	printk("Provisioned and configured!\n");
+    if (bt_mesh_is_provisioned()) {
+        if (models[3].keys[0] != BT_MESH_KEY_UNUSED) {
+            printk("Device provisioned and key bound, initiating broadcast.\n");
+            broadcast_message(work);
+        } else {
+            printk("Generic OnOff Client not bound to a key.\n");
+        }
+    } else {
+        printk("Device not provisioned.\n");
+    }
 }
-
+	
 static void bt_ready(int err)
 {
 	if (err) {
-		printk("Bluetooth init failed (err %d)\n", err);
-		return;
-	}
+        printk("Bluetooth init failed (err %d)\n", err);
+        return;
+    }
 
-	printk("Bluetooth initialized\n");
+    printk("Bluetooth initialized\n");
 
-	err = bt_mesh_init(&prov, &comp);
-	if (err) {
-		printk("Initializing mesh failed (err %d)\n", err);
-		return;
-	}
+    err = bt_mesh_init(&prov, &comp);
+    if (err) {
+        printk("Initializing mesh failed (err %d)\n", err);
+        return;
+    }
 
-	if (IS_ENABLED(CONFIG_SETTINGS)) {
-		settings_load();
-	}
+    if (IS_ENABLED(CONFIG_SETTINGS)) {
+        settings_load();
+    }
 
-	/* This will be a no-op if settings_load() loaded provisioning info */
-	bt_mesh_prov_enable(BT_MESH_PROV_ADV | BT_MESH_PROV_GATT);
+    bt_mesh_prov_enable(BT_MESH_PROV_ADV | BT_MESH_PROV_GATT);
 
-	printk("Mesh initialized\n");
+    printk("Mesh initialized\n");
+    k_work_init_delayable(&onoff.work, broadcast_message);
+    k_work_reschedule(&onoff.work, K_SECONDS(1));
 }
 
-static void broadcast_message(struct k_work *work)
-{
-	if (bt_mesh_is_provisioned()) {
-    // Toggle the LED state and the OnOff state variable
-    onoff.val = !onoff.val;
-    board_led_set(onoff.val); // Assuming board_led_set() sets the actual LED
-
-    // Send the OnOff state to all nodes
-    gen_onoff_send(onoff.val);
-
-    // Reschedule the work to run again after one second
-    k_work_reschedule(&onoff.work, K_SECONDS(1));
-}}
 
 int main(void)
 {
-	static struct k_work button_work;
-	int err = -1;
+	 static struct k_work button_work;
+    int err = -1;
 
-	printk("Initializing...\n");
+    printk("Initializing...\n");
 
-	if (IS_ENABLED(CONFIG_HWINFO)) {
-		err = hwinfo_get_device_id(dev_uuid, sizeof(dev_uuid));
-	}
+    if (IS_ENABLED(CONFIG_HWINFO)) {
+        err = hwinfo_get_device_id(dev_uuid, sizeof(dev_uuid));
+    }
 
-	if (err < 0) {
-		dev_uuid[0] = 0xdd;
-		dev_uuid[1] = 0xdd;
-	}
+    if (err < 0) {
+        dev_uuid[0] = 0xdd;
+        dev_uuid[1] = 0xdd;
+    }
 
-	k_work_init(&button_work, button_pressed);
+    k_work_init(&button_work, button_pressed);
 
-	err = board_init(&button_work);
-	if (err) {
-		printk("Board init failed (err: %d)\n", err);
-		return 0;
-	}
+    err = board_init(&button_work);
+    if (err) {
+        printk("Board init failed (err: %d)\n", err);
+        return 0;
+    }
 
-	k_work_init_delayable(&onoff.work, onoff_timeout);
+    k_work_init_delayable(&onoff.work, onoff_timeout);
 
-	/* Initialize the Bluetooth Subsystem */
-	err = bt_enable(bt_ready);
-	if (err) {
-		printk("Bluetooth init failed (err %d)\n", err);
-	}
-	k_work_init_delayable(&onoff.work, broadcast_message);
-    k_work_reschedule(&onoff.work, K_SECONDS(2));
-	return 0;
+    /* Initialize the Bluetooth Subsystem */
+    err = bt_enable(bt_ready);
+    if (err) {
+        printk("Bluetooth init failed (err %d)\n", err);
+    }
+
+    return 0;
 }
