@@ -25,6 +25,8 @@
 #define OP_ONOFF_SET_UNACK BT_MESH_MODEL_OP_2(0x82, 0x03)
 #define OP_ONOFF_STATUS    BT_MESH_MODEL_OP_2(0x82, 0x04)
 
+extern struct bt_mesh_model models[];
+
 static void attention_on(const struct bt_mesh_model *mod)			//attention_on and attention_off control an LED to indicate the device's attention state as part of the mesh health model.
 {
 	board_led_set(true);
@@ -43,7 +45,7 @@ static const struct bt_mesh_health_srv_cb health_cb = {
 static struct bt_mesh_health_srv health_srv = {
 	.cb = &health_cb,
 };
-
+static uint32_t current_seq_num = 0;
 BT_MESH_HEALTH_PUB_DEFINE(health_pub, 0);
 
 static const char *const onoff_str[] = { "off", "on" };		//onoff_str: An array of strings representing "off" and "on" states for easy logging.
@@ -128,6 +130,36 @@ static int onoff_status_send(const struct bt_mesh_model *model,
 	}
 
 	return bt_mesh_model_send(model, ctx, &buf, NULL, NULL);
+}
+struct mesh_message {
+    uint32_t seq_num;
+    // You can add more fields here if needed
+};
+/** Send an OnOff Set message with sequence number from the Generic OnOff Client to all nodes. */
+static int gen_onoff_send_with_seq(bool val)
+{
+    if (models[3].keys[0] == BT_MESH_KEY_UNUSED) {
+        printk("The Generic OnOff Client must be bound to a key before sending.\n");
+        return -ENOENT;
+    }
+
+    struct mesh_message msg = {
+        .seq_num = current_seq_num++
+    };
+
+    struct bt_mesh_msg_ctx ctx = {
+        .app_idx = models[3].keys[0],
+        .addr = BT_MESH_ADDR_ALL_NODES,
+        .send_ttl = BT_MESH_TTL_DEFAULT,
+    };
+
+    BT_MESH_MODEL_BUF_DEFINE(buf, OP_ONOFF_SET_UNACK, sizeof(msg));
+    bt_mesh_model_msg_init(&buf, OP_ONOFF_SET_UNACK);
+    net_buf_simple_add_mem(&buf, &msg, sizeof(msg));
+
+    printk("Sending message: Seq Num: %u\n", msg.seq_num);
+
+    return bt_mesh_model_send(&models[3], &ctx, &buf, NULL, NULL);
 }
 
 static void onoff_timeout(struct k_work *work)				//onoff_timeout handles the completion of a state transition due to delay or transition time, updating the LED state accordingly.
@@ -249,7 +281,7 @@ static const struct bt_mesh_model_op gen_onoff_cli_op[] = {
 };
 
 /* This application only needs one element to contain its models */
-static const struct bt_mesh_model models[] = {
+	struct bt_mesh_model models[] = {
 	BT_MESH_MODEL_CFG_SRV,
 	BT_MESH_MODEL_HEALTH_SRV(&health_srv, &health_pub),
 	BT_MESH_MODEL(BT_MESH_MODEL_ID_GEN_ONOFF_SRV, gen_onoff_srv_op, NULL,
@@ -321,7 +353,7 @@ static int gen_onoff_send(bool val)
     net_buf_simple_add_u8(&buf, val);
     net_buf_simple_add_u8(&buf, tid++);
 
-    printk("Broadcaster sending message: %s\n", onoff_str[val]);
+    //printk("Broadcaster sending message: %s\n", onoff_str[val]);
 
     return bt_mesh_model_send(&models[3], &ctx, &buf, NULL, NULL);
 }
@@ -333,6 +365,8 @@ static void broadcast_message(struct k_work *work)
 
         // Send the OnOff state to all nodes
         gen_onoff_send(onoff.val);
+		gen_onoff_send_with_seq(onoff.val);  // Toggle the value as needed
+    	k_work_reschedule(&onoff.work, K_MSEC(1000));  // Reschedule for 1-second intervals
 
         // Reschedule the work to run again after one second only if successful
         k_work_reschedule(&onoff.work, K_SECONDS(1));
