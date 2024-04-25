@@ -18,6 +18,9 @@
 #include <zephyr/bluetooth/bluetooth.h>
 #include <zephyr/bluetooth/mesh.h>
 #include <zephyr/bluetooth/mesh/access.h>
+#include <stdint.h>
+#include <stdbool.h>
+#include <limits.h>
 
 
 #include "board.h"
@@ -46,17 +49,41 @@ static int message_received(const struct bt_mesh_model *model,
                              struct bt_mesh_msg_ctx *ctx,
                              struct net_buf_simple *buf) {
     uint32_t seq_num = net_buf_simple_pull_le32(buf);
+     // Static variables to keep track of sequence and statistics
     static uint32_t last_seq_num = 0;
-    static uint32_t missed_packets = 0;
+    static bool is_first_packet = true;
+    static uint32_t total_missed_packets = 0;
+    static uint32_t total_received_packets = 0;
 
-    if (seq_num != last_seq_num + 1) {
-        missed_packets += (seq_num - last_seq_num - 1);
+    // Calculate missed packets if this is the first packet received
+    if (is_first_packet) {
+        // Assuming seq_num starts at 1 and this is the first packet observed
+        total_missed_packets = seq_num - 1; // All previous packets are considered missed
+        last_seq_num = seq_num;             // Update last_seq_num to the current
+        is_first_packet = false;            // Clear the first packet flag
+    } else {
+        // Calculate missed packets if there is a gap
+        if (seq_num != last_seq_num + 1) {
+            uint32_t num_missed = (seq_num > last_seq_num) ? (seq_num - last_seq_num - 1) : (UINT32_MAX - last_seq_num + seq_num);
+            total_missed_packets += num_missed;
+        }
+        // Update the last received sequence number
+        last_seq_num = seq_num;
     }
 
-    printk("Received seq_num %u, Missed packets: %u\n", seq_num, missed_packets);
+    // Increment the total received packets count
+    total_received_packets++;
 
-    last_seq_num = seq_num;
-	return 0;
+    // Calculate Packet Loss Ratio (PLR)
+    //float plr = ((float)total_missed_packets / (float)(total_received_packets + total_missed_packets)) * 100.0;
+    uint32_t plr = (total_missed_packets * 10000) / (total_received_packets + total_missed_packets);
+
+    // Log the received sequence number and PLR using printk
+    printk("Total missed packets: %u\n", total_missed_packets);
+    printk("Total received packets: %u\n", total_received_packets);
+    printk("Received seq_num %u, PLR: %u.%02u%%\n", seq_num, plr / 100, plr % 100);
+
+    return 0; // Return success
 }
 
 static int gen_onoff_get(const struct bt_mesh_model *model, struct bt_mesh_msg_ctx *ctx, struct net_buf_simple *buf);
