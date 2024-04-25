@@ -24,6 +24,7 @@
 #define OP_ONOFF_SET       BT_MESH_MODEL_OP_2(0x82, 0x02)
 #define OP_ONOFF_SET_UNACK BT_MESH_MODEL_OP_2(0x82, 0x03)
 #define OP_ONOFF_STATUS    BT_MESH_MODEL_OP_2(0x82, 0x04)
+#define OP_SEQ_NUMBER      BT_MESH_MODEL_OP_2(0x82, 0x05)
 
 extern struct bt_mesh_model models[];
 
@@ -153,8 +154,8 @@ static int gen_onoff_send_with_seq(bool val)
         .send_ttl = BT_MESH_TTL_DEFAULT,
     };
 
-    BT_MESH_MODEL_BUF_DEFINE(buf, OP_ONOFF_SET_UNACK, sizeof(msg));
-    bt_mesh_model_msg_init(&buf, OP_ONOFF_SET_UNACK);
+    BT_MESH_MODEL_BUF_DEFINE(buf, OP_SEQ_NUMBER, sizeof(msg));
+    bt_mesh_model_msg_init(&buf, OP_SEQ_NUMBER);
     net_buf_simple_add_mem(&buf, &msg, sizeof(msg));
 
     printk("Sending message: Seq Num: %u\n", msg.seq_num);
