@@ -23,6 +23,7 @@
 #include <limits.h>
 
 
+
 #include "board.h"
 // Include logging for easier debugging of mesh network issues.
 #include <zephyr/logging/log.h>
@@ -41,7 +42,7 @@ bool onoff_state = false; // Default state, adjust as necessary
 
 
 
-static uint8_t dev_uuid[16] = {0xdd, 0xdd};  // Example: Initialize with specific values if needed
+static uint8_t dev_uuid[16];  // Example: Initialize with specific values if needed
 
 // Forward declaration of callback functions
 // Handler for receiving messages with sequence numbers
@@ -155,6 +156,8 @@ static const struct bt_mesh_comp comp = {
     .elem = elements,
     .elem_count = ARRAY_SIZE(elements),
 };
+//Generate UUID Using HWINFO:
+
 
 
 
@@ -166,6 +169,8 @@ static void bt_ready(int err) {
     }
 
     printk("Bluetooth initialized\n");
+     // Generate a unique UUID
+   
 
     static const struct bt_mesh_prov prov = {
         .uuid = dev_uuid,
@@ -204,6 +209,13 @@ int main(void) {
     int err;
 
     printk("Initializing...\n");
+    if (IS_ENABLED(CONFIG_HWINFO)) {
+        err = hwinfo_get_device_id(dev_uuid, sizeof(dev_uuid));
+    }
+     if (err < 0) {
+        dev_uuid[0] = 0xdd;
+        dev_uuid[1] = 0xdd;
+    }
 
     err = bt_enable(bt_ready);
     if (err) {
