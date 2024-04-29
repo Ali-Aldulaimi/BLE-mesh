@@ -457,14 +457,14 @@ void button2_pressed(struct k_work *work) {
 }
 
 void button3_pressed(struct k_work *work) {
-    printk("Button 1 pressed. Setting time to 250 ms.\n");
-    reschedule_interval_ms = 250;
+    printk("Button 1 pressed. Setting time to 100 ms.\n");
+    reschedule_interval_ms = 100;
 	button_pressed(work);
 }
 
 void button4_pressed(struct k_work *work) {
-    printk("Button 1 pressed. Setting time to 100 ms.\n");
-    reschedule_interval_ms = 100;
+    printk("Button 1 pressed. Setting time to 50 ms.\n");
+    reschedule_interval_ms = 50;
 	button_pressed(work);
 }
 
