@@ -36,6 +36,25 @@ static struct {
 } onoff;
 
 static uint8_t dev_uuid[16];  // array to store device uuid
+static int rebroadcast(const struct bt_mesh_model *model, struct bt_mesh_msg_ctx *ctx, uint32_t seq_num, uint8_t ttl) {
+        struct net_buf_simple *msg = NET_BUF_SIMPLE(2 + 4 + 4);
+        net_buf_simple_init(msg, 0);
+        bt_mesh_model_msg_init(msg, OP_SEQ_NUMBER);
+        net_buf_simple_add_le32(msg, seq_num); // Re-add the sequence number
+
+        struct bt_mesh_msg_ctx new_ctx = *ctx;
+        new_ctx.send_ttl = ttl - 1;
+
+        int err = bt_mesh_model_send(model, &new_ctx, msg, NULL, NULL);
+        if (err) {
+            printk("Error rebroadcasting: %d\n", err);
+            return err;
+        } else {
+            printk("Rebroadcasting seq_num %u with new TTL %u\n", seq_num, new_ctx.send_ttl);
+        }
+    
+    return 0;
+}
 
 // Handler for receiving messages with sequence numbers
 static int message_received(const struct bt_mesh_model *model,
@@ -75,6 +94,11 @@ static int message_received(const struct bt_mesh_model *model,
     printk("Total missed packets: %u\n", total_missed_packets);
     printk("Total received packets: %u\n", total_received_packets);
     printk("Received seq_num %u, PLR: %u.%02u%%\n", seq_num, plr / 100, plr % 100);
+
+	//check if the ttl value for rebroadcasting
+	if (ctx->recv_ttl > 1) {
+		rebroadcast(model, ctx, seq_num, ctx->recv_ttl);
+}
 
     return 0; 
 }
