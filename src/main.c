@@ -171,8 +171,7 @@ static int onoff_status_send(const struct bt_mesh_model *model,struct bt_mesh_ms
 	} else {
 		net_buf_simple_add_u8(&buf, onoff.val);
 	}
-	uint32_t seq = bt_mesh_next_seq();  // Fetch the next sequence number.
-	printk("seq number is : %d\n",seq);
+	
 	return bt_mesh_model_send(model, ctx, &buf, NULL, NULL);
 }
 
