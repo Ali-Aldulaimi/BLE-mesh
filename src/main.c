@@ -30,6 +30,8 @@ void button2_pressed(struct k_work *work);
 void button3_pressed(struct k_work *work);
 void button4_pressed(struct k_work *work);
 
+
+
 // Array of gpio_callback structures for handling GPIO pin interrupt callbacks for up to 4 buttons.
 static struct gpio_callback button_cb_data[4];
 
@@ -169,7 +171,8 @@ static int onoff_status_send(const struct bt_mesh_model *model,struct bt_mesh_ms
 	} else {
 		net_buf_simple_add_u8(&buf, onoff.val);
 	}
-
+	uint32_t seq = bt_mesh_next_seq();  // Fetch the next sequence number.
+	printk("seq number is : %d\n",seq);
 	return bt_mesh_model_send(model, ctx, &buf, NULL, NULL);
 }
 
@@ -272,6 +275,7 @@ static int gen_onoff_set(const struct bt_mesh_model *model,struct bt_mesh_msg_ct
 {
 	(void)gen_onoff_set_unack(model, ctx, buf);
 	onoff_status_send(model, ctx);
+	
 
 	return 0;
 }
@@ -394,9 +398,10 @@ static void broadcast_message(struct k_work *work)
         board_led_set(onoff.val);
         // Send the OnOff state to all nodes
         gen_onoff_send(onoff.val);
-		gen_onoff_send_with_seq(onoff.val);  // Toggle the value as needed
+		uint32_t seq = bt_mesh_next_seq();  // Fetch the next sequence number.
+		//gen_onoff_send_with_seq(onoff.val);  // Toggle the value as needed
     	printk("Rescheduling broadcast. Current interval: %d ms\n", reschedule_interval_ms);
-        
+        printk("seq %d ms\n", seq);
         // Reschedule the work to run again after one second only if successful
        
             k_work_reschedule(&onoff.work, K_MSEC(reschedule_interval_ms));      
