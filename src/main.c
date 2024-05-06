@@ -397,7 +397,7 @@ static void broadcast_message(struct k_work *work)
         board_led_set(onoff.val);
         // Send the OnOff state to all nodes
         gen_onoff_send(onoff.val);
-		uint32_t seq = bt_mesh_next_seq();  // Fetch the next sequence number.
+		uint32_t seq = bt_mesh_next_seq()-1;  // Fetch the next sequence number.
 		//gen_onoff_send_with_seq(onoff.val);  // Toggle the value as needed
     	printk("Rescheduling broadcast. Current interval: %d ms\n", reschedule_interval_ms);
         printk("seq %d ms\n", seq);
@@ -447,8 +447,8 @@ static void bt_ready(int err)
    // k_work_reschedule(&onoff.work, K_SECONDS(0.1));
 }
 void button1_pressed(struct k_work *work) {
-    printk("Button 1 pressed. Setting time to 1000 ms.\n");
-    reschedule_interval_ms = 1000;
+    printk("Button 1 pressed. Setting time to 10000 ms.\n");
+    reschedule_interval_ms = 10000;
 	//k_work_init(&button_works[0], button_pressed);
 	button_pressed(work);
 	
