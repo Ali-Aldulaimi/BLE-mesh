@@ -107,7 +107,7 @@ int board_init(struct k_work *button_work_arg)
 void board_led_set(bool val)
 {
 	struct mb_display *disp = mb_display_get();
-
+	
 	mb_display_image(disp, MB_DISPLAY_MODE_DEFAULT, SYS_FOREVER_MS,
 			 &onoff[val], 1);
 }

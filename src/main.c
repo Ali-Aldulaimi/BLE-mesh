@@ -94,7 +94,8 @@ static int message_received(const struct bt_mesh_model *model,
     printk("Total missed packets: %u\n", total_missed_packets);
     printk("Total received packets: %u\n", total_received_packets);
     printk("Received seq_num %u, PLR: %u.%02u%%\n", seq_num, plr / 100, plr % 100);
-
+	uint32_t seq_num11 = net_buf_simple_pull_le32(buf); // Assuming the first 4 bytes are the sequence number if your protocol design sends it this way.
+    printk("Received a message from 0x%04x\n", ctx->addr);
 	//check if the ttl value for rebroadcasting
 	if (ctx->recv_ttl > 1) {
 		rebroadcast(model, ctx, seq_num, ctx->recv_ttl);
@@ -213,7 +214,8 @@ static int onoff_status_send(const struct bt_mesh_model *model,
 	} else {
 		net_buf_simple_add_u8(&buf, onoff.val);
 	}
-
+	
+	
 	return bt_mesh_model_send(model, ctx, &buf, NULL, NULL);
 }
 
@@ -224,6 +226,7 @@ static int gen_onoff_set(const struct bt_mesh_model *model,
 {
 	(void)gen_onoff_set_unack(model, ctx, buf);
 	onoff_status_send(model, ctx);
+	
 
 	return 0;
 }
@@ -311,13 +314,14 @@ static void onoff_timeout(struct k_work *work)
 		 * Bluetooth Mesh Model specification, section 3.1.1.
 		 */
 		board_led_set(true);
-
+		
 		k_work_reschedule(&onoff.work, K_MSEC(onoff.transition_time));
 		onoff.transition_time = 0;
 		return;
 	}
 
 	board_led_set(onoff.val);
+	
 }
 
 
@@ -347,7 +351,7 @@ int main(void)
 	}
 
 	k_work_init_delayable(&onoff.work, onoff_timeout);
-
+	
 	/* Initialize the Bluetooth Subsystem */
 	err = bt_enable(bt_ready);
 	if (err) {
