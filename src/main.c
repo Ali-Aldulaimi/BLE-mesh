@@ -266,7 +266,7 @@ static int gen_onoff_set_unack(const struct bt_mesh_model *model,struct bt_mesh_
 	 * transition time stored, so it can be applied in the timeout.
 	 */
 	k_work_reschedule(&onoff.work, K_MSEC(delay));
-
+	
 	return 0;
 }
 
@@ -370,6 +370,7 @@ static int gen_onoff_send(bool val)
         .app_idx = models[3].keys[0], /* Use the bound key */
         .addr = BT_MESH_ADDR_ALL_NODES,
         .send_ttl = BT_MESH_TTL_DEFAULT,
+		
     };
     static uint8_t tid;
 
@@ -378,7 +379,7 @@ static int gen_onoff_send(bool val)
         printk("The Generic OnOff Client must be bound to a key before sending.\n");
         return -ENOENT; // No such entry error to indicate the key is not bound
     }
-
+	printk("tid: %d\n ", tid);
     BT_MESH_MODEL_BUF_DEFINE(buf, OP_ONOFF_SET_UNACK, 2);
     bt_mesh_model_msg_init(&buf, OP_ONOFF_SET_UNACK);
     net_buf_simple_add_u8(&buf, val);
@@ -397,10 +398,10 @@ static void broadcast_message(struct k_work *work)
         board_led_set(onoff.val);
         // Send the OnOff state to all nodes
         gen_onoff_send(onoff.val);
-		uint32_t seq = bt_mesh_next_seq()-1;  // Fetch the next sequence number.
+		//uint32_t seq = bt_mesh_next_seq()-1;  // Fetch the next sequence number.
 		//gen_onoff_send_with_seq(onoff.val);  // Toggle the value as needed
     	printk("Rescheduling broadcast. Current interval: %d ms\n", reschedule_interval_ms);
-        printk("seq %d ms\n", seq);
+        //printk("seq %d ms\n", seq);
         // Reschedule the work to run again after one second only if successful
        
             k_work_reschedule(&onoff.work, K_MSEC(reschedule_interval_ms));      
