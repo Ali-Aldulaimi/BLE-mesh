@@ -66,7 +66,6 @@ static int message_received(const struct bt_mesh_model *model,
     static bool is_first_packet = true;
     static uint32_t total_missed_packets = 0;
     static uint32_t total_received_packets = 0;
-	uint8_t tid = net_buf_simple_pull_u8(buf);
 
     // Calculate missed packets if this is the first packet received
     if (is_first_packet) {
@@ -95,11 +94,10 @@ static int message_received(const struct bt_mesh_model *model,
     printk("Total missed packets: %u\n", total_missed_packets);
     printk("Total received packets: %u\n", total_received_packets);
     printk("Received seq_num %u, PLR: %u.%02u%%\n", seq_num, plr / 100, plr % 100);
-	
+
 	//check if the ttl value for rebroadcasting
 	if (ctx->recv_ttl > 1) {
-		rebroadcast(model, ctx, tid, ctx->recv_ttl);
-
+		rebroadcast(model, ctx, seq_num, ctx->recv_ttl);
 }
 
     return 0; 
@@ -180,12 +178,7 @@ static int gen_onoff_set_unack(const struct bt_mesh_model *model,
 	 * transition time stored, so it can be applied in the timeout.
 	 */
 	k_work_reschedule(&onoff.work, K_MSEC(delay));
-	printk("tid = %d\n",tid);
-	if (ctx->recv_ttl > 1) {
-		//rebroadcast(model, ctx, tid, ctx->recv_ttl);
-		k_work_reschedule(&onoff.tid, K_MSEC(delay));
-		
-}
+
 	return 0;
 }
 
@@ -220,8 +213,7 @@ static int onoff_status_send(const struct bt_mesh_model *model,
 	} else {
 		net_buf_simple_add_u8(&buf, onoff.val);
 	}
-	
-	
+
 	return bt_mesh_model_send(model, ctx, &buf, NULL, NULL);
 }
 
@@ -232,7 +224,6 @@ static int gen_onoff_set(const struct bt_mesh_model *model,
 {
 	(void)gen_onoff_set_unack(model, ctx, buf);
 	onoff_status_send(model, ctx);
-	
 
 	return 0;
 }
@@ -320,14 +311,13 @@ static void onoff_timeout(struct k_work *work)
 		 * Bluetooth Mesh Model specification, section 3.1.1.
 		 */
 		board_led_set(true);
-		
+
 		k_work_reschedule(&onoff.work, K_MSEC(onoff.transition_time));
 		onoff.transition_time = 0;
 		return;
 	}
 
 	board_led_set(onoff.val);
-	
 }
 
 
@@ -357,7 +347,7 @@ int main(void)
 	}
 
 	k_work_init_delayable(&onoff.work, onoff_timeout);
-	
+
 	/* Initialize the Bluetooth Subsystem */
 	err = bt_enable(bt_ready);
 	if (err) {
