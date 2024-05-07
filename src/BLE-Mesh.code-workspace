@@ -1,0 +1,42 @@
+{
+	"folders": [
+		{
+			"path": "../../../../Mythesis/BLE-Mesh"
+		},
+		{
+			"name": "mesh",
+			"path": ".."
+		}
+	],
+	"settings": {
+		"nrf-connect.applications": [],
+		"files.associations": {
+			"device.h": "c",
+			"settings.h": "c",
+			"devicetree.h": "c",
+			"gpio.h": "c",
+			"hwinfo.h": "c",
+			"byteorder.h": "c",
+			"bluetooth.h": "c",
+			"mesh.h": "c",
+			"main.h": "c",
+			"iterable_sections.h": "c",
+			"log.h": "c",
+			"access.h": "c",
+			"msg.h": "c",
+			"mb_display.h": "c",
+			"queue": "c",
+			"xhash": "c",
+			"compare": "c",
+			"atomic": "c",
+			"cstdint": "c",
+			"random": "c",
+			"type_traits": "c",
+			"xutility": "c",
+			"*.tcc": "c"
+		},
+		"nrf-connect.debugging.bindings": {
+			"c:/nordic/myApps/mesh/build": "Launch build"
+		}
+	}
+}

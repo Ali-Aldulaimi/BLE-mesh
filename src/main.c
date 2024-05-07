@@ -66,6 +66,7 @@ static int message_received(const struct bt_mesh_model *model,
     static bool is_first_packet = true;
     static uint32_t total_missed_packets = 0;
     static uint32_t total_received_packets = 0;
+	uint8_t tid = net_buf_simple_pull_u8(buf);
 
     // Calculate missed packets if this is the first packet received
     if (is_first_packet) {
@@ -94,11 +95,11 @@ static int message_received(const struct bt_mesh_model *model,
     printk("Total missed packets: %u\n", total_missed_packets);
     printk("Total received packets: %u\n", total_received_packets);
     printk("Received seq_num %u, PLR: %u.%02u%%\n", seq_num, plr / 100, plr % 100);
-	uint32_t seq_num11 = net_buf_simple_pull_le32(buf); // Assuming the first 4 bytes are the sequence number if your protocol design sends it this way.
-    printk("Received a message from 0x%04x\n", ctx->addr);
+	
 	//check if the ttl value for rebroadcasting
 	if (ctx->recv_ttl > 1) {
-		rebroadcast(model, ctx, seq_num, ctx->recv_ttl);
+		rebroadcast(model, ctx, tid, ctx->recv_ttl);
+
 }
 
     return 0; 
@@ -179,7 +180,12 @@ static int gen_onoff_set_unack(const struct bt_mesh_model *model,
 	 * transition time stored, so it can be applied in the timeout.
 	 */
 	k_work_reschedule(&onoff.work, K_MSEC(delay));
-
+	printk("tid = %d\n",tid);
+	if (ctx->recv_ttl > 1) {
+		//rebroadcast(model, ctx, tid, ctx->recv_ttl);
+		k_work_reschedule(&onoff.tid, K_MSEC(delay));
+		
+}
 	return 0;
 }
 
