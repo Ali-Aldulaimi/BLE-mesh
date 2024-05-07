@@ -399,7 +399,7 @@ static void broadcast_message(struct k_work *work)
         // Send the OnOff state to all nodes
         gen_onoff_send(onoff.val);
 		//uint32_t seq = bt_mesh_next_seq()-1;  // Fetch the next sequence number.
-		gen_onoff_send_with_seq(onoff.val);  // Toggle the value as needed
+		//gen_onoff_send_with_seq(onoff.val);  // Toggle the value as needed
     	printk("Rescheduling broadcast. Current interval: %d ms\n", reschedule_interval_ms);
         //printk("seq %d ms\n", seq);
         // Reschedule the work to run again after one second only if successful
