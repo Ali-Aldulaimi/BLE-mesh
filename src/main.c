@@ -2,7 +2,7 @@
 #include <zephyr/settings/settings.h>
 #include <zephyr/devicetree.h>
 #include <zephyr/device.h>
-//#include <zephyr/drivers/gpio.h>
+#include <zephyr/drivers/gpio.h>
 #include <zephyr/drivers/hwinfo.h>
 #include <zephyr/sys/byteorder.h>
 #include <zephyr/bluetooth/bluetooth.h>
@@ -57,51 +57,49 @@ static int rebroadcast(const struct bt_mesh_model *model, struct bt_mesh_msg_ctx
 }
 
 // Handler for receiving messages with sequence numbers
-static int message_received(const struct bt_mesh_model *model,
-                             struct bt_mesh_msg_ctx *ctx,
-                             struct net_buf_simple *buf) {
-    uint32_t seq_num = net_buf_simple_pull_le32(buf);
-     // Static variables to keep track of sequence and statistics
+static int PLR(uint32_t seq_num) {
+    // Static variables to keep track of sequence and statistics
     static uint32_t last_seq_num = 0;
+	static uint32_t first_seq_seq = 0;
     static bool is_first_packet = true;
     static uint32_t total_missed_packets = 0;
     static uint32_t total_received_packets = 0;
 
-    // Calculate missed packets if this is the first packet received
+    // Handling the first packet received
     if (is_first_packet) {
-        // Assuming seq_num starts at 1 and this is the first packet observed
-        total_missed_packets = seq_num - 1; // All previous packets are considered missed
-        last_seq_num = seq_num;             // Update last_seq_num to the current
-        is_first_packet = false;            // Clear the first packet flag
+        first_seq_seq = seq_num;
+		last_seq_num = seq_num ;  // Initialize the last sequence number with the first received sequence
+        is_first_packet = false; // Mark that the first packet has now been received
+        total_received_packets++; // Start counting packets with the first one received
     } else {
-        // Calculate missed packets if there is a gap
-        if (seq_num != last_seq_num + 1) {
-            uint32_t num_missed = (seq_num > last_seq_num) ? (seq_num - last_seq_num - 1) : (UINT32_MAX - last_seq_num + seq_num);
-            total_missed_packets += num_missed;
+        // Normal handling for all subsequent packets
+        if (seq_num > last_seq_num) {
+            // Calculating missed packets if there's a gap
+            total_missed_packets += (seq_num - last_seq_num - 1);
+            last_seq_num = seq_num; // Update the last received sequence number
+            total_received_packets++; // Increment the total received packets count
+        } else if (seq_num == last_seq_num) {
+            // Handle duplicate packet
+            printf("Duplicate packet received, seq_num: %u\n", seq_num);
+        } else {
+            // Handle out of order packet
+            printf("Out of order packet received, seq_num: %u, last_seq_num: %u\n", seq_num, last_seq_num);
         }
-        // Update the last received sequence number
-        last_seq_num = seq_num;
     }
 
-    // Increment the total received packets count
-    total_received_packets++;
-
     // Calculate Packet Loss Ratio (PLR)
-    //float plr = ((float)total_missed_packets / (float)(total_received_packets + total_missed_packets)) * 100.0;
-    uint32_t plr = (total_missed_packets * 10000) / (total_received_packets + total_missed_packets);
+    uint32_t total_packets_considered = total_received_packets + total_missed_packets;
+    uint32_t plr = (total_missed_packets * 10000) / total_packets_considered;
 
-  
+	printk("First received packet: %u\n", first_seq_seq);
     printk("Total missed packets: %u\n", total_missed_packets);
     printk("Total received packets: %u\n", total_received_packets);
     printk("Received seq_num %u, PLR: %u.%02u%%\n", seq_num, plr / 100, plr % 100);
+    printk("......................\n");
 
-	//check if the ttl value for rebroadcasting
-	if (ctx->recv_ttl > 1) {
-		rebroadcast(model, ctx, seq_num, ctx->recv_ttl);
+    return 0;
 }
 
-    return 0; 
-}
 static const uint32_t time_res[] = {
 	100,
 	MSEC_PER_SEC,
@@ -142,11 +140,25 @@ static inline uint8_t model_time_encode(int32_t ms)
 static int gen_onoff_set_unack(const struct bt_mesh_model *model,
 			       struct bt_mesh_msg_ctx *ctx,
 			       struct net_buf_simple *buf)
-{
+{	
+
+	if (buf->len < 6) {
+        printk("Buffer too short\n");
+        return -EINVAL;
+    }
 	uint8_t val = net_buf_simple_pull_u8(buf);
+	uint32_t seq = net_buf_simple_pull_le32(buf);
 	uint8_t tid = net_buf_simple_pull_u8(buf);
+	
 	int32_t trans = 0;
 	int32_t delay = 0;
+	printk("onoff.val : %d, tid: %d ,src:%d ,seq: %u \n", val, tid, ctx->addr ,seq);
+
+	PLR(seq);
+	if (ctx->recv_ttl < 1) {
+		rebroadcast(model, ctx, seq, ctx->recv_ttl);
+	}
+
 
 	if (buf->len) {
 		trans = model_time_decode(net_buf_simple_pull_u8(buf));
@@ -184,8 +196,8 @@ static int gen_onoff_set_unack(const struct bt_mesh_model *model,
 
 // Definition of the OnOff Client Model Operations
 static const struct bt_mesh_model_op gen_onoff_cli_op[] = {
-    {OP_ONOFF_STATUS, BT_MESH_LEN_MIN(1), message_received},
-    {OP_SEQ_NUMBER, BT_MESH_LEN_EXACT(4), message_received},  
+    {OP_ONOFF_STATUS, BT_MESH_LEN_MIN(4), PLR},
+   // {OP_SEQ_NUMBER, BT_MESH_LEN_EXACT(4), message_received},  
     BT_MESH_MODEL_OP_END,
 };
 
@@ -194,7 +206,7 @@ static int onoff_status_send(const struct bt_mesh_model *model,
 {
 	uint32_t remaining;
 
-	BT_MESH_MODEL_BUF_DEFINE(buf, OP_ONOFF_STATUS, 3);
+	BT_MESH_MODEL_BUF_DEFINE(buf, OP_ONOFF_STATUS, 6);
 	bt_mesh_model_msg_init(&buf, OP_ONOFF_STATUS);
 
 	remaining = k_ticks_to_ms_floor32(
