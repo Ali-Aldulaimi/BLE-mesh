@@ -376,16 +376,18 @@ static int gen_onoff_send_with_seq2(bool val)
         .addr = BT_MESH_ADDR_ALL_NODES,
         .send_ttl = BT_MESH_TTL_DEFAULT,
     };
+	static uint8_t tid =0;
 
-	printk("tid: %d\n", onoff.tid);
+	printk("tid: %d\n", tid);
 	printk("src: %d\n", onoff.src);
 	printk("ofoff.val: %d\n", onoff.val);
 	
 
-    BT_MESH_MODEL_BUF_DEFINE(buf, OP_ONOFF_SET_UNACK, 3);
+    BT_MESH_MODEL_BUF_DEFINE(buf, OP_ONOFF_SET_UNACK, 6);
     bt_mesh_model_msg_init(&buf, OP_ONOFF_SET_UNACK);
     net_buf_simple_add_u8(&buf, val);
-    net_buf_simple_add_u8(&buf, custom_seq_num++);  // Use a custom sequence number
+    net_buf_simple_add_le32(&buf, custom_seq_num++);  // Use a custom sequence number
+	net_buf_simple_add_u8(&buf, tid++);
 
     printk("Sending OnOff: %d, Seq Num: %u\n", val, custom_seq_num - 1);
 
