@@ -181,27 +181,7 @@ struct mesh_message {
 
 /** Send an OnOff Set message with sequence number from the Generic OnOff Client to all nodes. */
 
-static int gen_onoff_send_with_seq(bool val)
-{
-    if (models[3].keys[0] == BT_MESH_KEY_UNUSED) {
-        printk("The Generic OnOff Client must be bound to a key before sending.\n");
-        return -ENOENT;
-    }
-    struct mesh_message msg = {
-        .seq_num = current_seq_num++
-    };
-    struct bt_mesh_msg_ctx ctx = {
-        .app_idx = models[3].keys[0],
-        .addr = BT_MESH_ADDR_ALL_NODES,
-        .send_ttl = BT_MESH_TTL_DEFAULT,
-    };
-    BT_MESH_MODEL_BUF_DEFINE(buf, OP_SEQ_NUMBER, sizeof(msg));
-    bt_mesh_model_msg_init(&buf, OP_SEQ_NUMBER);
-    net_buf_simple_add_mem(&buf, &msg, sizeof(msg));
-    printk("Sending message: Seq Num: %u\n", msg.seq_num);
-	
-    return bt_mesh_model_send(&models[3], &ctx, &buf, NULL, NULL);
-}
+
 
 static void onoff_timeout(struct k_work *work)			//onoff_timeout handles the completion of a state transition due to delay or transition time, updating the LED state accordingly.
 {
@@ -382,6 +362,35 @@ static const struct bt_mesh_prov prov =
 
 
 
+static int gen_onoff_send_with_seq2(bool val)
+{
+    if (models[3].keys[0] == BT_MESH_KEY_UNUSED) {
+        printk("The Generic OnOff Client must be bound to a key before sending.\n");
+        return -ENOENT;
+    }
+
+    static uint32_t custom_seq_num = 0;  // Custom sequence number if needed
+
+    struct bt_mesh_msg_ctx ctx = {
+        .app_idx = models[3].keys[0],
+        .addr = BT_MESH_ADDR_ALL_NODES,
+        .send_ttl = BT_MESH_TTL_DEFAULT,
+    };
+
+	printk("tid: %d\n", onoff.tid);
+	printk("src: %d\n", onoff.src);
+	printk("ofoff.val: %d\n", onoff.val);
+	
+
+    BT_MESH_MODEL_BUF_DEFINE(buf, OP_ONOFF_SET_UNACK, 3);
+    bt_mesh_model_msg_init(&buf, OP_ONOFF_SET_UNACK);
+    net_buf_simple_add_u8(&buf, val);
+    net_buf_simple_add_u8(&buf, custom_seq_num++);  // Use a custom sequence number
+
+    printk("Sending OnOff: %d, Seq Num: %u\n", val, custom_seq_num - 1);
+
+    return bt_mesh_model_send(&models[3], &ctx, &buf, NULL, NULL);
+}
 
 
 
@@ -389,6 +398,47 @@ static const struct bt_mesh_prov prov =
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+static int gen_onoff_send_with_seq(bool val)
+{
+    if (models[3].keys[0] == BT_MESH_KEY_UNUSED) {
+        printk("The Generic OnOff Client must be bound to a key before sending.\n");
+        return -ENOENT;
+    }
+    struct mesh_message msg = {
+        .seq_num = current_seq_num++
+    };
+    struct bt_mesh_msg_ctx ctx = {
+        .app_idx = models[3].keys[0],
+        .addr = BT_MESH_ADDR_ALL_NODES,
+        .send_ttl = BT_MESH_TTL_DEFAULT,
+    };
+    BT_MESH_MODEL_BUF_DEFINE(buf, OP_SEQ_NUMBER, sizeof(msg));
+    bt_mesh_model_msg_init(&buf, OP_SEQ_NUMBER);
+    net_buf_simple_add_mem(&buf, &msg, sizeof(msg));
+    printk("Sending message: Seq Num: %u\n", msg.seq_num);
+	
+    return bt_mesh_model_send(&models[3], &ctx, &buf, NULL, NULL);
+}
 
 
 /** Send an OnOff Set message from the Generic OnOff Client to all nodes. */
@@ -433,7 +483,8 @@ static void broadcast_message(struct k_work *work)
         onoff.val = !onoff.val; // Toggle the LED state
         board_led_set(onoff.val);
         // Send the OnOff state to all nodes
-        gen_onoff_send(onoff.val);
+        //gen_onoff_send(onoff.val);
+		gen_onoff_send_with_seq2(onoff.val);
 		//uint32_t seq = bt_mesh_next_seq()-1;  // Fetch the next sequence number.
 		  // Toggle the value as needed
 		//gen_onoff_send_combined(onoff.val);
