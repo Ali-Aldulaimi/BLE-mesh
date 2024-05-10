@@ -30,8 +30,6 @@ void button2_pressed(struct k_work *work);
 void button3_pressed(struct k_work *work);
 void button4_pressed(struct k_work *work);
 
-
-
 // Array of gpio_callback structures for handling GPIO pin interrupt callbacks for up to 4 buttons.
 static struct gpio_callback button_cb_data[4];
 
@@ -42,7 +40,6 @@ static struct k_work button_works[4];
 extern struct bt_mesh_model models[];
 
 static int reschedule_interval_ms = 500;
-static uint32_t current_seq_num = 0;
 BT_MESH_HEALTH_PUB_DEFINE(health_pub, 0);
 static const char *const onoff_str[] = { "off", "on" };		//onoff_str: An array of strings representing "off" and "on" states for easy logging.
 static uint8_t dev_uuid[16];
@@ -171,16 +168,13 @@ static int onoff_status_send(const struct bt_mesh_model *model,struct bt_mesh_ms
 	} else {
 		net_buf_simple_add_u8(&buf, onoff.val);
 	}
-	
+
 	return bt_mesh_model_send(model, ctx, &buf, NULL, NULL);
 }
 
 struct mesh_message {
     uint32_t seq_num;
     };
-
-/** Send an OnOff Set message with sequence number from the Generic OnOff Client to all nodes. */
-
 
 
 static void onoff_timeout(struct k_work *work)			//onoff_timeout handles the completion of a state transition due to delay or transition time, updating the LED state accordingly.
@@ -202,18 +196,16 @@ static void onoff_timeout(struct k_work *work)			//onoff_timeout handles the com
 
 /* Generic OnOff Server message handlers */
 
-/*static int gen_onoff_get(const struct bt_mesh_model *model,					//Functions like gen_onoff_get, gen_onoff_set, and gen_onoff_set_unack handle incoming messages to get, set, or set without acknowledgment the OnOff state of the node.
+static int gen_onoff_get(const struct bt_mesh_model *model,					//Functions like gen_onoff_get, gen_onoff_set, and gen_onoff_set_unack handle incoming messages to get, set, or set without acknowledgment the OnOff state of the node.
 			 struct bt_mesh_msg_ctx *ctx,
 			 struct net_buf_simple *buf)
 {
 	onoff_status_send(model, ctx);
 	return 0;
-}*/
-
+}
 
 static int gen_onoff_set_unack(const struct bt_mesh_model *model,struct bt_mesh_msg_ctx *ctx,struct net_buf_simple *buf)
-{	
-	
+{
 	uint8_t val = net_buf_simple_pull_u8(buf);
 	uint8_t tid = net_buf_simple_pull_u8(buf);
 	int32_t trans = 0;
@@ -223,14 +215,7 @@ static int gen_onoff_set_unack(const struct bt_mesh_model *model,struct bt_mesh_
 		trans = model_time_decode(net_buf_simple_pull_u8(buf));
 		delay = net_buf_simple_pull_u8(buf) * 5;
 	}
-	/*printk("Buffer state before extraction:");
-    for (int i = 0; i < buf->len && i < 10; i++) {  // print first 10 bytes or less
-        printk(" %02x", buf->data[i]);
-    }
-	*/
-    printk(".....................\n");
-	
-	//uint32_t seq_num = extract_seq_num(buf);
+
 	/* Only perform change if the message wasn't a duplicate and the
 	 * value is different.
 	 */
@@ -243,31 +228,34 @@ static int gen_onoff_set_unack(const struct bt_mesh_model *model,struct bt_mesh_
 		/* No change */
 		return 0;
 	}
-	
+
+	printk("set: %s delay: %d ms time: %d ms\n", onoff_str[val], delay,
+	       trans);
+
 	onoff.tid = tid;
 	onoff.src = ctx->addr;
 	onoff.val = val;
 	onoff.transition_time = trans;
+
 	/* Schedule the next action to happen on the delay, and keep
 	 * transition time stored, so it can be applied in the timeout.
 	 */
 	k_work_reschedule(&onoff.work, K_MSEC(delay));
-	//print_buffer(buf);
+
 	return 0;
 }
 
-/*static int gen_onoff_set(const struct bt_mesh_model *model,struct bt_mesh_msg_ctx *ctx,struct net_buf_simple *buf)
+static int gen_onoff_set(const struct bt_mesh_model *model,struct bt_mesh_msg_ctx *ctx,struct net_buf_simple *buf)
 {
 	(void)gen_onoff_set_unack(model, ctx, buf);
 	onoff_status_send(model, ctx);
-	
 
 	return 0;
-}*/
+}
 
 static const struct bt_mesh_model_op gen_onoff_srv_op[] = {
-//	{ OP_ONOFF_GET,       BT_MESH_LEN_EXACT(0), gen_onoff_get },
-	//{ OP_ONOFF_SET,       BT_MESH_LEN_MIN(2),   gen_onoff_set },
+	{ OP_ONOFF_GET,       BT_MESH_LEN_EXACT(0), gen_onoff_get },
+	{ OP_ONOFF_SET,       BT_MESH_LEN_MIN(2),   gen_onoff_set },
 	{ OP_ONOFF_SET_UNACK, BT_MESH_LEN_MIN(2),   gen_onoff_set_unack },
 	BT_MESH_MODEL_OP_END,
 };
@@ -294,7 +282,7 @@ static int gen_onoff_status(const struct bt_mesh_model *model,struct bt_mesh_msg
 }
 
 static const struct bt_mesh_model_op gen_onoff_cli_op[] = {
-	//{OP_ONOFF_STATUS, BT_MESH_LEN_MIN(1), gen_onoff_status},
+	{OP_ONOFF_STATUS, BT_MESH_LEN_MIN(1), gen_onoff_status},
 	BT_MESH_MODEL_OP_END,
 };
 
@@ -349,20 +337,8 @@ static const struct bt_mesh_prov prov =
 	.reset = prov_reset,
 };
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-static int gen_onoff_send_with_seq2(bool val)
+/** Send an OnOff Set message from the Generic OnOff Client to all nodes. */
+static int gen_onoff_send_with_seq(bool val)
 {
     if (models[3].keys[0] == BT_MESH_KEY_UNUSED) {
         printk("The Generic OnOff Client must be bound to a key before sending.\n");
@@ -395,103 +371,13 @@ static int gen_onoff_send_with_seq2(bool val)
 }
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-static int gen_onoff_send_with_seq(bool val)
-{
-    if (models[3].keys[0] == BT_MESH_KEY_UNUSED) {
-        printk("The Generic OnOff Client must be bound to a key before sending.\n");
-        return -ENOENT;
-    }
-    struct mesh_message msg = {
-        .seq_num = current_seq_num++
-    };
-    struct bt_mesh_msg_ctx ctx = {
-        .app_idx = models[3].keys[0],
-        .addr = BT_MESH_ADDR_ALL_NODES,
-        .send_ttl = BT_MESH_TTL_DEFAULT,
-    };
-    BT_MESH_MODEL_BUF_DEFINE(buf, OP_SEQ_NUMBER, sizeof(msg));
-    bt_mesh_model_msg_init(&buf, OP_SEQ_NUMBER);
-    net_buf_simple_add_mem(&buf, &msg, sizeof(msg));
-    printk("Sending message: Seq Num: %u\n", msg.seq_num);
-	
-    return bt_mesh_model_send(&models[3], &ctx, &buf, NULL, NULL);
-}
-
-
-/** Send an OnOff Set message from the Generic OnOff Client to all nodes. */
-
-
-static int gen_onoff_send(bool val)
-{
-    struct bt_mesh_msg_ctx ctx = {
-        .app_idx = models[3].keys[0], /* Use the bound key */
-        .addr = BT_MESH_ADDR_ALL_NODES,
-        .send_ttl = BT_MESH_TTL_DEFAULT,
-    };
-    static uint8_t tid;
-
-    // Check if the app_idx is set to a valid key index
-    if (ctx.app_idx == BT_MESH_KEY_UNUSED) {
-        printk("The Generic OnOff Client must be bound to a key before sending.\n");
-        return -ENOENT; // No such entry error to indicate the key is not bound
-    }
-	uint16_t seq = bt_mesh_next_seq()+1;
-	printk("tid: %d\n", tid);
-	printk("src: %d\n", onoff.src);
-	printk("ofoff.val: %d\n", onoff.val);
-	printk("seq: %d\n", seq);
-	
-
-
-    BT_MESH_MODEL_BUF_DEFINE(buf, OP_ONOFF_SET_UNACK, 2);
-    bt_mesh_model_msg_init(&buf, OP_ONOFF_SET_UNACK);
-    net_buf_simple_add_u8(&buf, val);
-    net_buf_simple_add_u8(&buf, tid++);
-
-    //printk("Broadcaster sending message: %s\n", onoff_str[val]);
-	
-
-    return bt_mesh_model_send(&models[3], &ctx, &buf, NULL, NULL);
-
-}
 static void broadcast_message(struct k_work *work)
 {
     if (bt_mesh_is_provisioned() && models[3].keys[0] != BT_MESH_KEY_UNUSED) {
         onoff.val = !onoff.val; // Toggle the LED state
         board_led_set(onoff.val);
-        // Send the OnOff state to all nodes
-        //gen_onoff_send(onoff.val);
-		gen_onoff_send_with_seq2(onoff.val);
-		//uint32_t seq = bt_mesh_next_seq()-1;  // Fetch the next sequence number.
-		  // Toggle the value as needed
-		//gen_onoff_send_combined(onoff.val);
-    	//printk("Rescheduling broadcast. Current interval: %d ms\n", reschedule_interval_ms);
-        //printk("seq %d ms\n", seq);
+        gen_onoff_send_with_seq(onoff.val);
+		
         // Reschedule the work to run again after one second only if successful
        
             k_work_reschedule(&onoff.work, K_MSEC(reschedule_interval_ms));      
@@ -500,6 +386,7 @@ static void broadcast_message(struct k_work *work)
         printk("Cannot broadcast: either not provisioned or no key bound.\n");
     }
 }
+
 
 
 static void button_pressed(struct k_work *work)
@@ -538,8 +425,8 @@ static void bt_ready(int err)
    // k_work_reschedule(&onoff.work, K_SECONDS(0.1));
 }
 void button1_pressed(struct k_work *work) {
-    printk("Button 1 pressed. Setting time to 10000 ms.\n");
-    reschedule_interval_ms = 10000;
+    printk("Button 1 pressed. Setting time to 1000 ms.\n");
+    reschedule_interval_ms = 1000;
 	//k_work_init(&button_works[0], button_pressed);
 	button_pressed(work);
 	
