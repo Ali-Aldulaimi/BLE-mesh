@@ -361,8 +361,6 @@ static int gen_onoff_send_with_seq(bool val)
     net_buf_simple_add_le16(&buf, seq_num++);  // Use a custom sequence number
 	net_buf_simple_add_u8(&buf, tid++);
 
-	
-
     return bt_mesh_model_send(&models[3], &ctx, &buf, NULL, NULL);
 }
 
