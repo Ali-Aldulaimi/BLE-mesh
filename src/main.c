@@ -36,7 +36,7 @@ static struct {
 } onoff;
 
 static uint8_t dev_uuid[16];  // array to store device uuid
-static int rebroadcast(const struct bt_mesh_model *model, struct bt_mesh_msg_ctx *ctx, uint32_t seq_num, uint8_t ttl) {
+/*static int rebroadcast(const struct bt_mesh_model *model, struct bt_mesh_msg_ctx *ctx, uint32_t seq_num, uint8_t ttl) {
         struct net_buf_simple *msg = NET_BUF_SIMPLE(2 + 4 + 4);
         net_buf_simple_init(msg, 0);
         bt_mesh_model_msg_init(msg, OP_SEQ_NUMBER);
@@ -54,16 +54,16 @@ static int rebroadcast(const struct bt_mesh_model *model, struct bt_mesh_msg_ctx
         }
     
     return 0;
-}
+}*/
 
 // Handler for receiving messages with sequence numbers
-static int PLR(uint32_t seq_num) {
+static int PLR(uint16_t seq_num) {
     // Static variables to keep track of sequence and statistics
-    static uint32_t last_seq_num = 0;
-	static uint32_t first_seq_seq = 0;
+    static uint16_t last_seq_num = 0;
+	static uint16_t first_seq_seq = 0;
     static bool is_first_packet = true;
-    static uint32_t total_missed_packets = 0;
-    static uint32_t total_received_packets = 0;
+    static uint16_t total_missed_packets = 0;
+    static uint16_t total_received_packets = 0;
 
     // Handling the first packet received
     if (is_first_packet) {
@@ -142,22 +142,22 @@ static int gen_onoff_set_unack(const struct bt_mesh_model *model,
 			       struct net_buf_simple *buf)
 {	
 
-	if (buf->len < 6) {
+	if (buf->len < 4) {
         printk("Buffer too short\n");
         return -EINVAL;
     }
 	uint8_t val = net_buf_simple_pull_u8(buf);
-	uint32_t seq = net_buf_simple_pull_le32(buf);
+	uint16_t seq = net_buf_simple_pull_le16(buf);
 	uint8_t tid = net_buf_simple_pull_u8(buf);
 	
 	int32_t trans = 0;
 	int32_t delay = 0;
-	printk("onoff.val : %d, tid: %d ,src:%d ,seq: %u \n", val, tid, ctx->addr ,seq);
+	printk("Receiving onoff:%d, tid:%d ,src:%d ,seq:%u \n", val, tid, ctx->addr ,seq);
 
 	PLR(seq);
-	if (ctx->recv_ttl < 1) {
+	/*if (ctx->recv_ttl < 1) {
 		rebroadcast(model, ctx, seq, ctx->recv_ttl);
-	}
+	}*/
 
 
 	if (buf->len) {
