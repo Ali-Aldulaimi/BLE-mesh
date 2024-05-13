@@ -66,7 +66,6 @@ static void (*button_handlers[])(struct k_work *work) = {
 void button_callback(const struct device *dev, struct gpio_callback *cb,
 		    uint32_t pins)
 {
-	printk("Button pressed at %" PRIu32 "\n", k_cycle_get_32());
 	for (int i = 0; i < ARRAY_SIZE(buttons); i++) {
 		if (pins & BIT(buttons[i].pin)) {
 			k_work_submit(&button_works[i]);
@@ -229,8 +228,7 @@ static int gen_onoff_set_unack(const struct bt_mesh_model *model,struct bt_mesh_
 		return 0;
 	}
 
-	printk("set: %s delay: %d ms time: %d ms\n", onoff_str[val], delay,
-	       trans);
+	
 
 	onoff.tid = tid;
 	onoff.src = ctx->addr;
@@ -345,7 +343,7 @@ static int gen_onoff_send_with_seq(bool val)
         return -ENOENT;
     }
 
-    static uint32_t custom_seq_num = 0;  // Custom sequence number if needed
+    static uint16_t seq_num = 0;  
 
     struct bt_mesh_msg_ctx ctx = {
         .app_idx = models[3].keys[0],
@@ -354,18 +352,16 @@ static int gen_onoff_send_with_seq(bool val)
     };
 	static uint8_t tid =0;
 
-	printk("tid: %d\n", tid);
-	printk("src: %d\n", onoff.src);
-	printk("ofoff.val: %d\n", onoff.val);
-	
-
-    BT_MESH_MODEL_BUF_DEFINE(buf, OP_ONOFF_SET_UNACK, 6);
+    BT_MESH_MODEL_BUF_DEFINE(buf, OP_ONOFF_SET_UNACK, 4);
     bt_mesh_model_msg_init(&buf, OP_ONOFF_SET_UNACK);
     net_buf_simple_add_u8(&buf, val);
-    net_buf_simple_add_le32(&buf, custom_seq_num++);  // Use a custom sequence number
+    net_buf_simple_add_le16(&buf, seq_num++);  // Use a custom sequence number
 	net_buf_simple_add_u8(&buf, tid++);
 
-    printk("Sending OnOff: %d, Seq Num: %u\n", val, custom_seq_num - 1);
+	printk("tid: %d\n", tid);
+	printk("src: %d\n", onoff.src);
+    printk("Sending OnOff: %d, Seq Num: %u\n", val,seq_num - 1);
+	printk("............................\n");
 
     return bt_mesh_model_send(&models[3], &ctx, &buf, NULL, NULL);
 }
@@ -433,19 +429,19 @@ void button1_pressed(struct k_work *work) {
 }
 
 void button2_pressed(struct k_work *work) {
-    printk("Button 1 pressed. Setting time to 500 ms.\n");
+    printk("Button 2 pressed. Setting time to 500 ms.\n");
     reschedule_interval_ms = 500;
 	button_pressed(work);
 }
 
 void button3_pressed(struct k_work *work) {
-    printk("Button 1 pressed. Setting time to 100 ms.\n");
+    printk("Button 3 pressed. Setting time to 100 ms.\n");
     reschedule_interval_ms = 100;
 	button_pressed(work);
 }
 
 void button4_pressed(struct k_work *work) {
-    printk("Button 1 pressed. Setting time to 50 ms.\n");
+    printk("Button 4 pressed. Setting time to 50 ms.\n");
     reschedule_interval_ms = 50;
 	button_pressed(work);
 }
