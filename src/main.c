@@ -68,6 +68,7 @@ void button_callback(const struct device *dev, struct gpio_callback *cb,
 {
 	for (int i = 0; i < ARRAY_SIZE(buttons); i++) {
 		if (pins & BIT(buttons[i].pin)) {
+			k_work_cancel(&button_works[i]);
 			k_work_submit(&button_works[i]);
 		}
 	}
@@ -342,16 +343,13 @@ static int gen_onoff_send_with_seq(bool val)
         printk("The Generic OnOff Client must be bound to a key before sending.\n");
         return -ENOENT;
     }
-
     static uint16_t seq_num = 0;  
-
     struct bt_mesh_msg_ctx ctx = {
         .app_idx = models[3].keys[0],
         .addr = BT_MESH_ADDR_ALL_NODES,
         .send_ttl = BT_MESH_TTL_DEFAULT,
     };
 	static uint8_t tid =0;
-
     BT_MESH_MODEL_BUF_DEFINE(buf, OP_ONOFF_SET_UNACK, 4);
     bt_mesh_model_msg_init(&buf, OP_ONOFF_SET_UNACK);
     net_buf_simple_add_u8(&buf, val);
@@ -366,7 +364,6 @@ static int gen_onoff_send_with_seq(bool val)
     return bt_mesh_model_send(&models[3], &ctx, &buf, NULL, NULL);
 }
 
-
 static void broadcast_message(struct k_work *work)
 {
     if (bt_mesh_is_provisioned() && models[3].keys[0] != BT_MESH_KEY_UNUSED) {
@@ -374,9 +371,8 @@ static void broadcast_message(struct k_work *work)
         board_led_set(onoff.val);
         gen_onoff_send_with_seq(onoff.val);
 		
-        // Reschedule the work to run again after one second only if successful
-       
-            k_work_reschedule(&onoff.work, K_MSEC(reschedule_interval_ms));      
+        // Reschedule the work to run again 
+        k_work_reschedule(&onoff.work, K_MSEC(reschedule_interval_ms));      
     } else {
         // Do not reschedule if not provisioned or key not bound
         printk("Cannot broadcast: either not provisioned or no key bound.\n");
@@ -421,9 +417,9 @@ static void bt_ready(int err)
    // k_work_reschedule(&onoff.work, K_SECONDS(0.1));
 }
 void button1_pressed(struct k_work *work) {
-    printk("Button 1 pressed. Setting time to 1000 ms.\n");
+    //k_work_cancel(&button_works[4]);
+	printk("Button 1 pressed. Setting time to 1000 ms.\n");
     reschedule_interval_ms = 1000;
-	//k_work_init(&button_works[0], button_pressed);
 	button_pressed(work);
 	
 }
@@ -479,10 +475,11 @@ int main(void)
 			printk("Error %d: failed to configure interrupt on %s pin %d\n", ret, buttons[i].port->name, buttons[i].pin);
 			return 0;
 		}
+		//k_work_init_delayable(&onoff.work, onoff_timeout);
 		k_work_init(&button_works[i], button_handlers[i]);
 		gpio_init_callback(&button_cb_data[i], button_callback, BIT(buttons[i].pin));
 		gpio_add_callback(buttons[i].port, &button_cb_data[i]);
-		k_work_init_delayable(&onoff.work, onoff_timeout);
+		
 		err = board_init(&button_works[i]);
     	if (err) {
         printk("Board init failed (err: %d)\n", err);
