@@ -343,23 +343,25 @@ static int gen_onoff_send_with_seq(bool val)
         printk("The Generic OnOff Client must be bound to a key before sending.\n");
         return -ENOENT;
     }
-    static uint16_t seq_num = 0;  
+    static uint16_t seq_num = 1;  
     struct bt_mesh_msg_ctx ctx = {
         .app_idx = models[3].keys[0],
         .addr = BT_MESH_ADDR_ALL_NODES,
         .send_ttl = BT_MESH_TTL_DEFAULT,
     };
 	static uint8_t tid =0;
+	printk("tid: %d\n", tid);
+	printk("src: %d\n", onoff.src);
+    printk("Sending OnOff: %d, Seq Num: %u\n", val,seq_num);
+	printk("............................\n");
+
     BT_MESH_MODEL_BUF_DEFINE(buf, OP_ONOFF_SET_UNACK, 4);
     bt_mesh_model_msg_init(&buf, OP_ONOFF_SET_UNACK);
     net_buf_simple_add_u8(&buf, val);
     net_buf_simple_add_le16(&buf, seq_num++);  // Use a custom sequence number
 	net_buf_simple_add_u8(&buf, tid++);
 
-	printk("tid: %d\n", tid);
-	printk("src: %d\n", onoff.src);
-    printk("Sending OnOff: %d, Seq Num: %u\n", val,seq_num - 1);
-	printk("............................\n");
+	
 
     return bt_mesh_model_send(&models[3], &ctx, &buf, NULL, NULL);
 }
