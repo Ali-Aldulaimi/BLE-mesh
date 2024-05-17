@@ -10,6 +10,7 @@
 #include "board.h"
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
+#include <zephyr/sys/reboot.h>
 
 /* Define Bluetooth Mesh operation codes (opcodes)*/
 #define OP_ONOFF_GET       BT_MESH_MODEL_OP_2(0x82, 0x01)
@@ -32,6 +33,7 @@ void button4_pressed(struct k_work *work);
 
 // Array of gpio_callback structures for handling GPIO pin interrupt callbacks for up to 4 buttons.
 static struct gpio_callback button_cb_data[4];
+static struct k_timer reboot_timer;
 
 // Array of k_work structures used to define deferred work tasks for handling button presses in a thread context.
 static struct k_work button_works[4];
@@ -60,7 +62,11 @@ static void (*button_handlers[])(struct k_work *work) = {
 	button4_pressed
 };
 
-
+static void reboot_timer_expiry(struct k_timer *timer_id)
+{
+    printk("Timer expired. Rebooting the system.\n");
+    sys_reboot(SYS_REBOOT_WARM);  // Use SYS_REBOOT_COLD if a full reset is required
+}
 
 /* Generic button pressed callback */
 void button_callback(const struct device *dev, struct gpio_callback *cb,
@@ -414,6 +420,8 @@ static void bt_ready(int err)
     bt_mesh_prov_enable(BT_MESH_PROV_ADV | BT_MESH_PROV_GATT);
     printk("Mesh initialized\n");
     k_work_init_delayable(&onoff.work, broadcast_message);
+	k_timer_init(&reboot_timer, reboot_timer_expiry, NULL);
+    k_timer_start(&reboot_timer, K_SECONDS(62), K_NO_WAIT); 
    // k_work_reschedule(&onoff.work, K_SECONDS(0.1));
 }
 void button1_pressed(struct k_work *work) {
