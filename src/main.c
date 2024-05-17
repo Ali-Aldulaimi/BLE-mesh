@@ -16,34 +16,26 @@
 #include <power/reboot.h>
 
 
-//LOG_MODULE_REGISTER(mesh_observer, LOG_LEVEL_DBG);
-
-
 // Definitions of macro mesh operations
 #define OP_ONOFF_GET       BT_MESH_MODEL_OP_2(0x82, 0x01)
 #define OP_ONOFF_SET       BT_MESH_MODEL_OP_2(0x82, 0x02)
 #define OP_ONOFF_SET_UNACK BT_MESH_MODEL_OP_2(0x82, 0x03)
 #define OP_ONOFF_STATUS    BT_MESH_MODEL_OP_2(0x82, 0x04)
-#define OP_SEQ_NUMBER      BT_MESH_MODEL_OP_2(0x82, 0x05)  // Operation code for sequence number
 #define OP_REBOOT BT_MESH_MODEL_OP_2(0x82, 0xFF)
+#define MY_VENDOR_MODEL_ID 0x8001
+
 bool onoff_state = false; 
 
-static void handle_reboot(struct bt_mesh_model *model,
-                          struct bt_mesh_msg_ctx *ctx,
-                          struct net_buf_simple *buf)
-{
+int handle_reboot(struct bt_mesh_model *model, struct bt_mesh_msg_ctx *ctx, struct net_buf_simple *buf) {
     printk("Reboot command received. Rebooting...\n");
-    sys_reboot(SYS_REBOOT_COLD);  // or SYS_REBOOT_WARM as needed
+    sys_reboot(SYS_REBOOT_COLD);
+    return 0;
 }
 
-static const struct bt_mesh_model_op custom_model_ops[] = {
+static const struct bt_mesh_model_op reboot_model_ops[] = {
     { OP_REBOOT, 0, handle_reboot },
     BT_MESH_MODEL_OP_END,
 };
-
-
-
-
 
 
 static struct {
@@ -55,25 +47,6 @@ static struct {
 } onoff;
 
 static uint8_t dev_uuid[16];  // array to store device uuid
-/*static int rebroadcast(const struct bt_mesh_model *model, struct bt_mesh_msg_ctx *ctx, uint32_t seq_num, uint8_t ttl) {
-        struct net_buf_simple *msg = NET_BUF_SIMPLE(2 + 4 + 4);
-        net_buf_simple_init(msg, 0);
-        bt_mesh_model_msg_init(msg, OP_SEQ_NUMBER);
-        net_buf_simple_add_le32(msg, seq_num); // Re-add the sequence number
-
-        struct bt_mesh_msg_ctx new_ctx = *ctx;
-        new_ctx.send_ttl = ttl - 1;
-
-        int err = bt_mesh_model_send(model, &new_ctx, msg, NULL, NULL);
-        if (err) {
-            printk("Error rebroadcasting: %d\n", err);
-            return err;
-        } else {
-            printk("Rebroadcasting seq_num %u with new TTL %u\n", seq_num, new_ctx.send_ttl);
-        }
-    
-    return 0;
-}*/
 
 // Handler for receiving messages with sequence numbers
 static int PLR(uint16_t seq_num) {
@@ -216,6 +189,7 @@ static int gen_onoff_set_unack(const struct bt_mesh_model *model,
 // Definition of the OnOff Client Model Operations
 static const struct bt_mesh_model_op gen_onoff_cli_op[] = {
     {OP_ONOFF_STATUS, BT_MESH_LEN_MIN(4), PLR},
+	
    // {OP_SEQ_NUMBER, BT_MESH_LEN_EXACT(4), message_received},  
     BT_MESH_MODEL_OP_END,
 };
@@ -279,7 +253,7 @@ static struct bt_mesh_model models[] = {
     BT_MESH_MODEL_CFG_SRV,
     BT_MESH_MODEL(BT_MESH_MODEL_ID_GEN_ONOFF_CLI, gen_onoff_cli_op, NULL, NULL),
     BT_MESH_MODEL(BT_MESH_MODEL_ID_GEN_ONOFF_SRV, gen_onoff_srv_op, NULL, NULL),
-	BT_MESH_MODEL(BT_MESH_MODEL_ID_GEN_ONOFF_SRV, custom_model_ops, NULL, NULL),
+	BT_MESH_MODEL_VND(BT_COMP_ID_LF, MY_VENDOR_MODEL_ID, reboot_model_ops, NULL, NULL)
 };
 
 // Mesh Element Declaration
@@ -294,12 +268,6 @@ static const struct bt_mesh_comp comp = {
     .elem = elements,
     .elem_count = ARRAY_SIZE(elements),
 };
-static struct k_timer reset_timer;
-static void reset_timer_expiry(struct k_timer *timer_id)
-{
-    printk("Timer expired. Resetting the system.\n");
-    sys_reboot(SYS_REBOOT_COLD);
-}
 
 // Bluetooth ready callback
 static void bt_ready(int err) {
@@ -338,10 +306,8 @@ static void bt_ready(int err) {
     } else {
         printk("Not provisioned\n");
     }
-	k_timer_init(&reset_timer, reset_timer_expiry, NULL);
-    k_timer_start(&reset_timer, K_SECONDS(62), K_NO_WAIT);
+	
 }
-
 static void onoff_timeout(struct k_work *work)
 {
 	if (onoff.transition_time) {
