@@ -25,8 +25,26 @@
 #define OP_ONOFF_SET_UNACK BT_MESH_MODEL_OP_2(0x82, 0x03)
 #define OP_ONOFF_STATUS    BT_MESH_MODEL_OP_2(0x82, 0x04)
 #define OP_SEQ_NUMBER      BT_MESH_MODEL_OP_2(0x82, 0x05)  // Operation code for sequence number
-
+#define OP_REBOOT BT_MESH_MODEL_OP_2(0x82, 0xFF)
 bool onoff_state = false; 
+
+static void handle_reboot(struct bt_mesh_model *model,
+                          struct bt_mesh_msg_ctx *ctx,
+                          struct net_buf_simple *buf)
+{
+    printk("Reboot command received. Rebooting...\n");
+    sys_reboot(SYS_REBOOT_COLD);  // or SYS_REBOOT_WARM as needed
+}
+
+static const struct bt_mesh_model_op custom_model_ops[] = {
+    { OP_REBOOT, 0, handle_reboot },
+    BT_MESH_MODEL_OP_END,
+};
+
+
+
+
+
 
 static struct {
 	bool val;
@@ -261,11 +279,13 @@ static struct bt_mesh_model models[] = {
     BT_MESH_MODEL_CFG_SRV,
     BT_MESH_MODEL(BT_MESH_MODEL_ID_GEN_ONOFF_CLI, gen_onoff_cli_op, NULL, NULL),
     BT_MESH_MODEL(BT_MESH_MODEL_ID_GEN_ONOFF_SRV, gen_onoff_srv_op, NULL, NULL),
+	BT_MESH_MODEL(BT_MESH_MODEL_ID_GEN_ONOFF_SRV, custom_model_ops, NULL, NULL),
 };
 
 // Mesh Element Declaration
 static struct bt_mesh_elem elements[] = {
     BT_MESH_ELEM(0, models, BT_MESH_MODEL_NONE),
+	
 };
 
 // Mesh Composition
