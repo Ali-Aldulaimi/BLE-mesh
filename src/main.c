@@ -13,6 +13,7 @@
 #include <limits.h>
 #include "board.h"
 #include <zephyr/logging/log.h>
+#include <power/reboot.h>
 
 
 //LOG_MODULE_REGISTER(mesh_observer, LOG_LEVEL_DBG);
@@ -273,6 +274,12 @@ static const struct bt_mesh_comp comp = {
     .elem = elements,
     .elem_count = ARRAY_SIZE(elements),
 };
+static struct k_timer reset_timer;
+static void reset_timer_expiry(struct k_timer *timer_id)
+{
+    printk("Timer expired. Resetting the system.\n");
+    sys_reboot(SYS_REBOOT_COLD);
+}
 
 // Bluetooth ready callback
 static void bt_ready(int err) {
@@ -311,6 +318,8 @@ static void bt_ready(int err) {
     } else {
         printk("Not provisioned\n");
     }
+	k_timer_init(&reset_timer, reset_timer_expiry, NULL);
+    k_timer_start(&reset_timer, K_SECONDS(62), K_NO_WAIT);
 }
 
 static void onoff_timeout(struct k_work *work)

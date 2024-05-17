@@ -1,0 +1,17 @@
+{
+	"folders": [
+		{
+			"path": "../../../../mesh_1"
+		},
+		{
+			"name": "mesh",
+			"path": ".."
+		}
+	],
+	"settings": {
+		"nrf-connect.applications": [],
+		"files.associations": {
+			"xutility": "c"
+		}
+	}
+}
