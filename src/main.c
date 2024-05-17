@@ -18,12 +18,18 @@
 #define OP_ONOFF_SET_UNACK BT_MESH_MODEL_OP_2(0x82, 0x03)
 #define OP_ONOFF_STATUS    BT_MESH_MODEL_OP_2(0x82, 0x04)
 #define OP_SEQ_NUMBER      BT_MESH_MODEL_OP_2(0x82, 0x05)
+#define OP_REBOOT BT_MESH_MODEL_OP_2(0x82, 0xFF)
+
 #define SLEEP_TIME_MS	1
 /* Define button nodes from the devicetree */
 #define SW0_NODE	DT_ALIAS(sw0)
 #define SW1_NODE	DT_ALIAS(sw1)
 #define SW2_NODE	DT_ALIAS(sw2)
 #define SW3_NODE	DT_ALIAS(sw3)
+
+
+
+
 
 /* Function declarations for button press handlers */
 void button1_pressed(struct k_work *work);
@@ -59,7 +65,7 @@ static void (*button_handlers[])(struct k_work *work) = {
 	button1_pressed,
 	button2_pressed,
 	button3_pressed,
-	button4_pressed
+	button4_pressed,
 };
 
 static void reboot_timer_expiry(struct k_timer *timer_id)
@@ -401,6 +407,41 @@ static void button_pressed(struct k_work *work)
     }
 }
 
+
+
+
+
+
+static void send_reboot_command(void)
+{
+    printk("Sending reboot command to all nodes...\n");
+
+    struct bt_mesh_msg_ctx ctx = {
+        .app_idx = models[3].keys[0],
+        .addr = BT_MESH_ADDR_ALL_NODES,
+        .send_ttl = BT_MESH_TTL_DEFAULT,
+    };
+
+    BT_MESH_MODEL_BUF_DEFINE(msg, OP_REBOOT, 0);
+    bt_mesh_model_msg_init(&msg, OP_REBOOT);
+
+    int err = bt_mesh_model_send(&models[3], &ctx, &msg, NULL, NULL);
+    if (err) {
+        printk("Failed to send reboot command (err %d)\n", err);
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
 static void bt_ready(int err)
 {
 	if (err) {
@@ -445,9 +486,9 @@ void button3_pressed(struct k_work *work) {
 }
 
 void button4_pressed(struct k_work *work) {
-    printk("Button 4 pressed. Setting time to 50 ms.\n");
-    reschedule_interval_ms = 50;
-	button_pressed(work);
+    printk("Button 4 pressed. rebooting.\n");
+    //reschedule_interval_ms = 50;
+	send_reboot_command();
 }
 
 /*------------------------------------------------------------------------------------------ MAIN ---------------------------------------------------------------------------*/
