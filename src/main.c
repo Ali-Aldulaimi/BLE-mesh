@@ -39,7 +39,7 @@ void button4_pressed(struct k_work *work);
 
 // Array of gpio_callback structures for handling GPIO pin interrupt callbacks for up to 4 buttons.
 static struct gpio_callback button_cb_data[4];
-static struct k_timer reboot_timer;
+
 
 // Array of k_work structures used to define deferred work tasks for handling button presses in a thread context.
 static struct k_work button_works[4];
@@ -461,8 +461,7 @@ static void bt_ready(int err)
     bt_mesh_prov_enable(BT_MESH_PROV_ADV | BT_MESH_PROV_GATT);
     printk("Mesh initialized\n");
     k_work_init_delayable(&onoff.work, broadcast_message);
-	k_timer_init(&reboot_timer, reboot_timer_expiry, NULL);
-    k_timer_start(&reboot_timer, K_SECONDS(62), K_NO_WAIT); 
+	
    // k_work_reschedule(&onoff.work, K_SECONDS(0.1));
 }
 void button1_pressed(struct k_work *work) {
@@ -487,8 +486,9 @@ void button3_pressed(struct k_work *work) {
 
 void button4_pressed(struct k_work *work) {
     printk("Button 4 pressed. rebooting.\n");
-    //reschedule_interval_ms = 50;
-	send_reboot_command();
+    send_reboot_command();
+	//k_msleep(2000); 
+	//sys_reboot(SYS_REBOOT_WARM); 
 }
 
 /*------------------------------------------------------------------------------------------ MAIN ---------------------------------------------------------------------------*/
@@ -508,33 +508,17 @@ int main(void)
 
 	int ret;
 	for (int i = 0; i < ARRAY_SIZE(buttons); i++) {
-		if (!gpio_is_ready_dt(&buttons[i])) {
-			printk("Error: button device %s is not ready\n", buttons[i].port->name);
-			return 0;
-		}
-
-	ret = gpio_pin_configure_dt(&buttons[i], GPIO_INPUT);
-		if (ret != 0) {
-			printk("Error %d: failed to configure %s pin %d\n", ret, buttons[i].port->name, buttons[i].pin);
-			return 0;
-		}
-
-		ret = gpio_pin_interrupt_configure_dt(&buttons[i], GPIO_INT_EDGE_TO_ACTIVE);
-		if (ret != 0) {
-			printk("Error %d: failed to configure interrupt on %s pin %d\n", ret, buttons[i].port->name, buttons[i].pin);
-			return 0;
-		}
-		//k_work_init_delayable(&onoff.work, onoff_timeout);
-		k_work_init(&button_works[i], button_handlers[i]);
-		gpio_init_callback(&button_cb_data[i], button_callback, BIT(buttons[i].pin));
-		gpio_add_callback(buttons[i].port, &button_cb_data[i]);
-		
-		err = board_init(&button_works[i]);
-    	if (err) {
-        printk("Board init failed (err: %d)\n", err);
-        return 0;
+    if (!device_is_ready(buttons[i].port)) {
+        printk("Error: GPIO device %s not ready\n", buttons[i].port->name);
+        return -EINVAL;
     }
-	}
+
+    gpio_pin_configure_dt(&buttons[i], GPIO_INPUT);
+    gpio_pin_interrupt_configure_dt(&buttons[i], GPIO_INT_EDGE_TO_ACTIVE);
+    k_work_init(&button_works[i], button_handlers[i]);
+    gpio_init_callback(&button_cb_data[i], button_callback, BIT(buttons[i].pin));
+    gpio_add_callback(buttons[i].port, &button_cb_data[i]);
+}
 	err = bt_enable(bt_ready);
     if (err) {
         printk("Bluetooth init failed (err %d)\n", err);
