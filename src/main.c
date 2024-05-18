@@ -518,6 +518,13 @@ int main(void)
     k_work_init(&button_works[i], button_handlers[i]);
     gpio_init_callback(&button_cb_data[i], button_callback, BIT(buttons[i].pin));
     gpio_add_callback(buttons[i].port, &button_cb_data[i]);
+	k_work_init_delayable(&onoff.work, onoff_timeout);
+	err = board_init(&button_works[0]);
+    	if (err) {
+        printk("Board init failed (err: %d)\n", err);
+        return 0;
+    }
+	
 }
 	err = bt_enable(bt_ready);
     if (err) {
