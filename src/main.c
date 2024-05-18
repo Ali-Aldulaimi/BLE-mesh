@@ -410,16 +410,6 @@ static void button_pressed(struct k_work *work)
 
 
 
-static void reboot_complete_cb(struct bt_mesh_model *model, struct bt_mesh_msg_ctx *ctx, void *buf, size_t len, int err, void *user_data)
-{
-    if (err) {
-        printk("Message send failed with error %d\n", err);
-    } else {
-        printk("Reboot command sent successfully, rebooting...\n");
-        k_msleep(2000);  // Optional: Delay here if needed
-        sys_reboot(SYS_REBOOT_WARM);
-    }
-}
 
 
 
@@ -436,7 +426,7 @@ static void send_reboot_command(void)
     BT_MESH_MODEL_BUF_DEFINE(msg, OP_REBOOT, 0);
     bt_mesh_model_msg_init(&msg, OP_REBOOT);
 
-    int err = bt_mesh_model_send(&models[3], &ctx, &msg, reboot_complete_cb, NULL);
+    int err = bt_mesh_model_send(&models[3], &ctx, &msg, NULL, NULL);
     if (err) {
         printk("Failed to initiate send of reboot command (err %d)\n", err);
     }
