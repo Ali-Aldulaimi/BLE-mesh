@@ -28,9 +28,6 @@
 #define SW3_NODE	DT_ALIAS(sw3)
 
 
-
-
-
 /* Function declarations for button press handlers */
 void button1_pressed(struct k_work *work);
 void button2_pressed(struct k_work *work);
@@ -67,12 +64,6 @@ static void (*button_handlers[])(struct k_work *work) = {
 	button3_pressed,
 	button4_pressed,
 };
-
-static void reboot_timer_expiry(struct k_timer *timer_id)
-{
-    printk("Timer expired. Rebooting the system.\n");
-    sys_reboot(SYS_REBOOT_WARM);  // Use SYS_REBOOT_COLD if a full reset is required
-}
 
 /* Generic button pressed callback */
 void button_callback(const struct device *dev, struct gpio_callback *cb,
@@ -116,14 +107,7 @@ static struct {
 	struct k_work_delayable work;
 } onoff;													//onoff: A structure to keep track of the current state, the source address of the last command, 
 
-/* OnOff messages' transition time and remaining time fields are encoded as an
- * 8 bit value with a 6 bit step field and a 2 bit resolution field.
- * The resolution field maps to:
- * 0: 100 ms
- * 1: 1 s
- * 2: 10 s
- * 3: 20 min
- */
+
 static const uint32_t time_res[] = {			//time_res: An array defining time resolutions for decoding and encoding transition times.
 	100,
 	MSEC_PER_SEC,
@@ -240,8 +224,6 @@ static int gen_onoff_set_unack(const struct bt_mesh_model *model,struct bt_mesh_
 		/* No change */
 		return 0;
 	}
-
-	
 
 	onoff.tid = tid;
 	onoff.src = ctx->addr;
@@ -391,8 +373,6 @@ static void broadcast_message(struct k_work *work)
     }
 }
 
-
-
 static void button_pressed(struct k_work *work)
 {
     if (bt_mesh_is_provisioned()) {
@@ -406,12 +386,6 @@ static void button_pressed(struct k_work *work)
         printk("Device not provisioned.\n");
     }
 }
-
-
-
-
-
-
 
 static void send_reboot_command(void)
 {
@@ -431,16 +405,6 @@ static void send_reboot_command(void)
         printk("Failed to initiate send of reboot command (err %d)\n", err);
     }
 }
-
-
-
-
-
-
-
-
-
-
 
 static void bt_ready(int err)
 {
@@ -462,7 +426,6 @@ static void bt_ready(int err)
     printk("Mesh initialized\n");
     k_work_init_delayable(&onoff.work, broadcast_message);
 	
-   // k_work_reschedule(&onoff.work, K_SECONDS(0.1));
 }
 void button1_pressed(struct k_work *work) {
     //k_work_cancel(&button_works[4]);
@@ -487,8 +450,6 @@ void button3_pressed(struct k_work *work) {
 void button4_pressed(struct k_work *work) {
     printk("Button 4 pressed. rebooting.\n");
     send_reboot_command();
-	//k_msleep(2000); 
-	//sys_reboot(SYS_REBOOT_WARM); 
 }
 
 /*------------------------------------------------------------------------------------------ MAIN ---------------------------------------------------------------------------*/
@@ -534,10 +495,7 @@ int main(void)
 	while (1) {
 		k_msleep(SLEEP_TIME_MS);
 	}
-   
        
-    
-    /* Initialize the Bluetooth Subsystem */
-    
+   
     return 0;
 }
